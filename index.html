@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UTN Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 50px; }
+        input, button { font-size: 16px; padding: 10px; }
+        #response { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>UTN Chatbot</h1>
+    <input type="text" id="question" placeholder="Ask me about UTN..." />
+    <button onclick="askChatbot()">Send</button>
+    <p id="response"></p>
+
+    <script>
+        async function askChatbot() {
+            let question = document.getElementById("question").value;
+            let responseBox = document.getElementById("response");
+
+            responseBox.innerHTML = "Thinking...";
+
+            let response = await fetch("http://localhost:5000/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question: question })
+            });
+
+            let data = await response.json();
+            responseBox.innerHTML = data.response;
+        }
+    </script>
+</body>
+</html>
