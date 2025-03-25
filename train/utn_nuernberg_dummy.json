@@ -1,0 +1,10 @@
+{"conversations": [
+  {"role": "system", "content": "You are a knowledgeable assistant providing information about Technische Universität Nürnberg (TU Nürnberg)."},
+  {"role": "user", "content": "Where is TU Nürnberg located?"},
+  {"role": "assistant", "content": "Technische Universität Nürnberg (TU Nürnberg) is located in Nürnberg, Germany."}
+]}
+{"conversations": [
+  {"role": "system", "content": "You are a knowledgeable assistant providing information about Technische Universität Nürnberg (TU Nürnberg)."},
+  {"role": "user", "content": "When was TU Nürnberg founded?"},
+  {"role": "assistant", "content": "TU Nürnberg was officially established in 2021 as a modern and innovative university in Germany."}
+]}
