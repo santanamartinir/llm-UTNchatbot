@@ -1,0 +1,5 @@
+model_name: "Qwen/Qwen2.5-0.5B-Instruct"
+model_path: "/retrained_qwen" 
+dataset_file: "/Users/akashbhansali/Documents/assignments/llm/final_projec/llm-UTNchatbot/data/q_a.json"
+pretrained: "True" # true or false ()
+num_qa_pairs: 10  # Number of QA pairs to randomly select
