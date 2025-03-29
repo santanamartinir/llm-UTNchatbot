@@ -10,16 +10,14 @@ model = AutoModelForCausalLM.from_pretrained(model_name)
 with open('datasets/q_a.json', 'r') as file:
     qa_data = json.load(file)
 
-with open('datasets/q_a_2.json', 'r') as file:
-    qa_data_2 = json.load(file)
+# with open('datasets/q_a_2.json', 'r') as file:
+#     qa_data_2 = json.load(file)
 
 prompt_prefix = "The following are examples of questions and answers regarding university and student life:\n"
 prompt_prefix += "\n".join(
-    [f"Q: {item['question']}\nA: {item['answer']}" for item in qa_data + qa_data_2]
+    [f"Q: {item['question']}\nA: {item['answer']}" for item in qa_data]  # + qa_data_2
 )
-prompt_prefix += "\nNow answer the user's question shortly (not Q&A, only give an answer). Do not reason about your answer, be confident!.\n"
-
-# TODO: maybe json the output and only return actual answer?
+prompt_prefix += "\nNow please answer the user's question *shortly, once* in about 200 words max. Respond in JSON format like: {\"answer\": \"<your short answer>\"}.\n"
 
 
 def generate_response(prompt):
@@ -31,10 +29,20 @@ def generate_response(prompt):
     output = model.generate(**inputs, max_length=inputs.input_ids.shape[-1] + 200, pad_token_id=tokenizer.eos_token_id)
     decoded_output = tokenizer.decode(output[0], skip_special_tokens=True)
 
+    if "Q: " in decoded_output and "\nA:" in decoded_output:
+        decoded_output = decoded_output.split("\nA:")[-1].strip()
+
+    try:
+        json_start = decoded_output.index("{")
+        json_str = decoded_output[json_start:]
+        return json.loads(json_str)["answer"]
+    except Exception as e:
+        print(f"Failed to extract JSON answer: {e}")
+        return decoded_output.strip()
     # Extract only generated answer
-    generated_answer = decoded_output.split(f"Q: {prompt}\nA:")[-1].strip()
-    print(generated_answer)
-    return generated_answer
+    # generated_answer = decoded_output.split(f"Q: {prompt}\nA:")[-1].strip()
+    # print(generated_answer)
+    # return generated_answer
 
 
 # Example Question
