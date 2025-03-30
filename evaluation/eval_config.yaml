@@ -1,5 +1,6 @@
 model_name: "Qwen/Qwen2.5-0.5B-Instruct"
-model_path: "/retrained_qwen" 
-dataset_file: "/Users/akashbhansali/Documents/assignments/llm/final_projec/llm-UTNchatbot/data/q_a.json"
-pretrained: "True" # true or false ()
+model_path: "/home/utn/firi22ka/Desktop/jenga/llm/llm-UTNchatbot/qwen2.5-0.5b-utn-lora-akash" 
+dataset_file: "datasets/q_a.json"
+pretrained: False # true or false ()
 num_qa_pairs: 10  # Number of QA pairs to randomly select
+result_file_path: "eval_res.txt"

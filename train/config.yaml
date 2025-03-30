@@ -1,14 +1,14 @@
 # config.yaml
-dataset_file: "utn_nuernberg_dummy.json"
-model_name: "Qwen/Qwen2.5-0.5B-Instruct"
-output_dir: "./qwen2.5-0.5b-utn-lora"
+dataset_file: "data/q_a/UTN_q_a_merged.jsonl"
+model_name: "models/Qwen2.5-0.5B-Instruct" # model name or path 
+output_dir: "./lora_20_epochs_akash"
 max_length: 512
 
 # Training hyperparameters
 evaluation_strategy: "no"
 learning_rate: 0.0002
 per_device_train_batch_size: 1
-num_train_epochs: 1
+num_train_epochs: 20
 weight_decay: 0.01
 save_total_limit: 1
 logging_dir: "./logs"

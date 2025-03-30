@@ -10,3 +10,4 @@ rouge-score
 prettytable
 pyyaml
 bert-score
+wandb

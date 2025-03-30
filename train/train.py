@@ -2,6 +2,7 @@
 import os
 import argparse
 import yaml
+import wandb
 import torch
 
 # Make sure to set this at the very beginning
@@ -11,7 +12,6 @@ os.environ["PYTORCH_ENABLE_SDPA"] = "0"
 import transformers.integrations.sdpa_attention as sdpa_attention
 
 def patched_repeat_kv(hidden_states, num_key_value_groups):
-    # If hidden_states is 5-dimensional, assume shape: (batch, extra, num_key_value_heads, slen, head_dim)
     if hidden_states.dim() == 5:
         extra = hidden_states.size(1)
         if extra == 1:
@@ -19,7 +19,6 @@ def patched_repeat_kv(hidden_states, num_key_value_groups):
         else:
             batch, extra, n_heads, slen, head_dim = hidden_states.shape
             hidden_states = hidden_states.view(batch * extra, n_heads, slen, head_dim)
-    # Now assume hidden_states is 4D
     batch, num_key_value_heads, slen, head_dim = hidden_states.shape
     return hidden_states
 
@@ -37,15 +36,16 @@ def load_config(config_path):
     return config
 
 def main():
-    # Parse command-line arguments and load config
     args = parse_args()
     config = load_config(args.config)
+
+    # Initialize W&B
+    wandb.init(project=config.get("wandb_project", "qwen-training"), config=config)
 
     # --- Dataset and Tokenizer ---
     from datasets import load_dataset
     from transformers import AutoTokenizer
 
-    # Load dataset from the JSON file (config["dataset_file"] should point to your dataset file)
     dataset = load_dataset('json', data_files=config["dataset_file"])
     
 
@@ -96,12 +96,13 @@ def main():
     from transformers import AutoModelForCausalLM
     from peft import LoraConfig, get_peft_model
 
-    # Load pre-trained model
     model = AutoModelForCausalLM.from_pretrained(config["model_name"])
 
     print("C")
 
+    print("C")
     # Disable SDPA / sliding window attention via config flags if present
+
     if hasattr(model.config, "use_sdpa"):
         model.config.use_sdpa = False
     if hasattr(model.config, "use_sliding_window_attention"):
@@ -109,7 +110,6 @@ def main():
     if hasattr(model.config, "sliding_window_attention"):
         model.config.sliding_window_attention = False
 
-    # Create LoRA configuration from config parameters
     lora_config = LoraConfig(
         r=config.get("lora_r", 8),
         lora_alpha=config.get("lora_alpha", 32),
@@ -118,7 +118,6 @@ def main():
         target_modules=config.get("lora_target_modules", ["q_proj", "v_proj"])
     )
 
-    # Wrap the model with LoRA
     model = get_peft_model(model, lora_config)
 
     # --- Training Setup ---
@@ -135,6 +134,7 @@ def main():
         logging_dir=config.get("logging_dir", "./logs"),
         logging_steps=config.get("logging_steps", 1),
         do_eval=config.get("do_eval", False),
+        report_to=["wandb"]  # Enable W&B logging
     )
 
     trainer = Trainer(
@@ -149,6 +149,9 @@ def main():
     # --- Save the Fine-Tuned Model and Tokenizer ---
     model.save_pretrained(config["output_dir"])
     tokenizer.save_pretrained(config["output_dir"])
+
+    # Finish W&B run
+    wandb.finish()
 
 if __name__ == "__main__":
     main()

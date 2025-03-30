@@ -22,11 +22,12 @@ with open(args.config, "r") as f:
 
 # Load model from path or hf
 model_name = config["model_name"]
+print(f'{config["pretrained"] = }')
 if config["pretrained"]:
     model_name = config["model_name"]
     print(f"Loading pretrained model: {model_name} from Hugging Face...")
 else:
-    model_name = config["local_model_path"]
+    model_name = config["model_path"]
     print(f"Loading retrained model from: {model_name}...")
 
 # Load model & tokenizer
@@ -115,6 +116,6 @@ for item in random_qa_pairs:
 # print(table)
 
 # Save Table to eval_table.txt
-with open("eval_table_with_bert_score_bleu_rogue.txt", "w") as f:
+with open(config["result_file_path"], "w") as f:
     f.write(table.get_string())
 
