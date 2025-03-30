@@ -4,27 +4,8 @@ import argparse
 import yaml
 import torch
 
-# Make sure to set this at the very beginning
-os.environ["PYTORCH_ENABLE_SDPA"] = "0"
-
-# ----- Monkey-Patch to handle extra dimension in SDPA -----
-import transformers.integrations.sdpa_attention as sdpa_attention
-
-def patched_repeat_kv(hidden_states, num_key_value_groups):
-    # If hidden_states is 5-dimensional, assume shape: (batch, extra, num_key_value_heads, slen, head_dim)
-    if hidden_states.dim() == 5:
-        extra = hidden_states.size(1)
-        if extra == 1:
-            hidden_states = hidden_states.squeeze(1)
-        else:
-            batch, extra, n_heads, slen, head_dim = hidden_states.shape
-            hidden_states = hidden_states.view(batch * extra, n_heads, slen, head_dim)
-    # Now assume hidden_states is 4D
-    batch, num_key_value_heads, slen, head_dim = hidden_states.shape
-    return hidden_states
-
-sdpa_attention.repeat_kv = patched_repeat_kv
-# -----------------------------------------------------------
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Qwen with LoRA on UTN data")
@@ -56,38 +37,40 @@ def main():
 
     def tokenize_function(examples):
         conversation = examples["conversations"]
-        text = ""
-        for turn in conversation:
-            role = turn["role"]
-            content = turn["content"]
-            text += f"<|im_start|>{role}\n{content}<|im_end|>\n"
-        
-        tokenized = tokenizer(
-            text,
-            truncation=True,
-            padding="max_length",
-            max_length=config.get("max_length", 1024),
-            return_tensors="pt"
-        )
 
-        # Mask labels for everything except assistant response
-        labels = tokenized["input_ids"].clone()
-        current_idx = 0
-        labels_masked = [-100] * labels.size(1)  # Mask all tokens initially
+        all_input_ids = []
+        all_labels = []
 
         for turn in conversation:
             role = turn["role"]
             content = f"<|im_start|>{role}\n{turn['content']}<|im_end|>\n"
-            tokenized_turn = tokenizer(content, return_tensors="pt").input_ids.size(1)
             
+            tokenized_turn = tokenizer(content, add_special_tokens=False).input_ids
+
+            all_input_ids.extend(tokenized_turn)
+
             if role == "assistant":
-                labels_masked[current_idx:current_idx+tokenized_turn] = labels[0, current_idx:current_idx+tokenized_turn]
-            
-            current_idx += tokenized_turn
+                all_labels.extend(tokenized_turn)
+            else:
+                all_labels.extend([-100] * len(tokenized_turn))
 
-        tokenized["labels"] = torch.tensor([labels_masked])
-        return tokenized
+        # Ensure consistent length
+        max_len = config.get("max_length", 1024)
+        all_input_ids = all_input_ids[:max_len]
+        all_labels = all_labels[:max_len]
 
+        pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
+        padding_length = max_len - len(all_input_ids)
+
+        if padding_length > 0:
+            all_input_ids += [pad_token_id] * padding_length
+            all_labels += [-100] * padding_length
+
+        return {
+            "input_ids": torch.tensor(all_input_ids),
+            "labels": torch.tensor(all_labels),
+            "attention_mask": torch.tensor([1] * (max_len - padding_length) + [0] * padding_length)
+        }
 
     # Apply tokenization
     tokenized_datasets = dataset.map(tokenize_function, batched=False)
@@ -96,20 +79,13 @@ def main():
     from transformers import AutoModelForCausalLM
     from peft import LoraConfig, get_peft_model
 
-    # Load pre-trained model
-    model = AutoModelForCausalLM.from_pretrained(config["model_name"])
+    # Corrected model loading
+    model = AutoModelForCausalLM.from_pretrained(
+        config["model_name"],
+        attn_implementation="eager"  # Explicitly avoid SDPA conflicts
+    )
 
-    print("C")
-
-    # Disable SDPA / sliding window attention via config flags if present
-    if hasattr(model.config, "use_sdpa"):
-        model.config.use_sdpa = False
-    if hasattr(model.config, "use_sliding_window_attention"):
-        model.config.use_sliding_window_attention = False
-    if hasattr(model.config, "sliding_window_attention"):
-        model.config.sliding_window_attention = False
-
-    # Create LoRA configuration from config parameters
+    # LoRA configuration
     lora_config = LoraConfig(
         r=config.get("lora_r", 8),
         lora_alpha=config.get("lora_alpha", 32),
@@ -118,8 +94,9 @@ def main():
         target_modules=config.get("lora_target_modules", ["q_proj", "v_proj"])
     )
 
-    # Wrap the model with LoRA
+    # Wrap model with LoRA
     model = get_peft_model(model, lora_config)
+
 
     # --- Training Setup ---
     from transformers import TrainingArguments, Trainer
@@ -135,6 +112,7 @@ def main():
         logging_dir=config.get("logging_dir", "./logs"),
         logging_steps=config.get("logging_steps", 1),
         do_eval=config.get("do_eval", False),
+        max_grad_norm=1.0,
     )
 
     trainer = Trainer(

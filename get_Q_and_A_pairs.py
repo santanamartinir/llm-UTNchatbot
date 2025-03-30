@@ -29,7 +29,6 @@ Instructions:
 - Generate a suitable number of diverse Q&A pairs (anything between 0 and 100, depending on the amount of information present) based on the provided text.
 - The questions should reflect realistic queries students (especially international) might ask, using natural and varied phrasing.
 - Include casual language or informal greetings occasionally to mimic real interactions.
-- Occasionally add multi-turn conversations where a student asks a follow-up question based on the previous assistant answer.
 - Answers should be concise (maximum 2–3 sentences), self-contained, and clearly understandable without additional context.
 - Ensure answers directly utilize information provided in the text, without introducing details not mentioned.
 - Cover multiple relevant topics present in the provided text.
