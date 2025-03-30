@@ -2,6 +2,7 @@
 import os
 import argparse
 import yaml
+import torch
 
 # Make sure to set this at the very beginning
 os.environ["PYTORCH_ENABLE_SDPA"] = "0"
@@ -47,8 +48,11 @@ def main():
     # Load dataset from the JSON file (config["dataset_file"] should point to your dataset file)
     dataset = load_dataset('json', data_files=config["dataset_file"])
     
+
+    print("A")
     # Initialize tokenizer
     tokenizer = AutoTokenizer.from_pretrained(config["model_name"])
+    print("B")
 
     def tokenize_function(examples):
         conversation = examples["conversations"]
@@ -56,21 +60,34 @@ def main():
         for turn in conversation:
             role = turn["role"]
             content = turn["content"]
-            if role == "system":
-                text += f"<|im_start|>system\n{content}<|im_end|>\n"
-            elif role == "user":
-                text += f"<|im_start|>user\n{content}<|im_end|>\n"
-            elif role == "assistant":
-                text += f"<|im_start|>assistant\n{content}<|im_end|>\n"
+            text += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+        
         tokenized = tokenizer(
             text,
             truncation=True,
             padding="max_length",
-            max_length=config.get("max_length", 512),
+            max_length=config.get("max_length", 1024),
             return_tensors="pt"
         )
-        tokenized["labels"] = tokenized["input_ids"].clone()
+
+        # Mask labels for everything except assistant response
+        labels = tokenized["input_ids"].clone()
+        current_idx = 0
+        labels_masked = [-100] * labels.size(1)  # Mask all tokens initially
+
+        for turn in conversation:
+            role = turn["role"]
+            content = f"<|im_start|>{role}\n{turn['content']}<|im_end|>\n"
+            tokenized_turn = tokenizer(content, return_tensors="pt").input_ids.size(1)
+            
+            if role == "assistant":
+                labels_masked[current_idx:current_idx+tokenized_turn] = labels[0, current_idx:current_idx+tokenized_turn]
+            
+            current_idx += tokenized_turn
+
+        tokenized["labels"] = torch.tensor([labels_masked])
         return tokenized
+
 
     # Apply tokenization
     tokenized_datasets = dataset.map(tokenize_function, batched=False)
@@ -81,6 +98,8 @@ def main():
 
     # Load pre-trained model
     model = AutoModelForCausalLM.from_pretrained(config["model_name"])
+
+    print("C")
 
     # Disable SDPA / sliding window attention via config flags if present
     if hasattr(model.config, "use_sdpa"):
