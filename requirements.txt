@@ -5,3 +5,8 @@ datasets
 flask
 flask-cors
 accelerate
+nltk
+rouge-score
+prettytable
+pyyaml
+bert-score
