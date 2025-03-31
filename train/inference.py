@@ -20,9 +20,12 @@ def load_models(base_model_name, lora_model_path, device):
     return tokenizer, base_model, lora_model
 
 def generate_response(model, tokenizer, user_input, device, max_length=512):
-    system_prompt = ("You are a knowledgeable assistant providing information about the "
-                     "University of Technology Nuremberg (UTN) (German: Technische Universität Nürnberg (UTN)), "
-                     "student life in Germany, and life in Nuremberg.")
+    system_prompt = (
+                        "You are a helpful and knowledgeable assistant from the University of Technology Nuremberg (UTN) (German: Technische Universität Nürnberg (UTN)). "
+                        "You provide information about the university, student life in Germany, and life in Nuremberg."
+                        "Answer the student's question briefly (max 50 words), clearly, and professionally. "
+                        "Provide direct answers only, no additional questions or examples.\n\n"
+                    )
 
     formatted_input = (
         f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
